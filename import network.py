@@ -49,3 +49,39 @@ Content-Type: text/html
 
     cl.send(response)
     cl.close()
+
+
+
+
+import machine
+import time
+
+trig = machine.Pin(9, machine.Pin.OUT)
+echo = machine.Pin(10, machine.Pin.IN)
+
+# Ensure trigger pin is low
+trig.value(0)
+time.sleep_us(2)
+
+while True:
+    # Send a 10 microsecond high pulse to trigger the sensor
+    trig.value(1)
+    time.sleep_us(10)
+    trig.value(0)
+
+    # Wait for echo to go high
+    while echo.value() == 0:
+        start = time.ticks_us()
+
+    # Wait for echo to go low
+    while echo.value() == 1:
+        end = time.ticks_us()
+
+    # Calculate duration and distance
+    duration = time.ticks_diff(end, start)
+    distance = (duration * 0.0343) / 2
+
+    # Print the distance in cm
+    print("Distance:", distance, "cm")
+
+    time.sleep(0.5)  # Half-second delay between measurements
