@@ -1,45 +1,50 @@
-#define TRIG_PIN 5
-#define ECHO_PIN 18
-#include WiFi.h
-float distance = 0
-
-//SSID of your network
-char ssid[] = "yourNetwork";
-//password of your WPA Network
-char pass[] = "secretPassword";
+#define TRIG_PIN1 5
+#define ECHO_PIN1 18
+#define TRIG_PIN2 22
+#define ECHO_PIN2 23
+float distance1 = 0;
+float distance2 = 0;
 
 void setup() {
   Serial.begin(115200);
-  pinMode(TRIG_PIN, OUTPUT);
-  pinMode(ECHO_PIN, INPUT);
+  pinMode(TRIG_PIN1, OUTPUT);
+  pinMode(ECHO_PIN1, INPUT);
+  pinMode(TRIG_PIN2, OUTPUT);
+  pinMode(ECHO_PIN2, INPUT);
+}
 
-  WiFi.begin(ssid, pass);
+void sensors() {
+  // Send a 10us pulse to trigger measurement for sensor 1
+  digitalWrite(TRIG_PIN1, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN1, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN1, LOW);
+  // Send a 10us pulse to trigger measurement for sensor 2
+  digitalWrite(TRIG_PIN2, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN2, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN2, LOW);
+  // Read the echo pulse
+  long duration1 = pulseIn(ECHO_PIN1, HIGH);
+  long duration2 = pulseIn(ECHO_PIN2, HIGH);
 
-  Serial.print("Connecting to Wi-Fi");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print("This is working");
-  }
-  Serial.println("\nConnected!");
+  // Calculate distance in cm (speed of sound: ~343 m/s)
+  distance1 = duration1 * 0.0343 / 2;
+  distance2 = duration2 * 0.0343 / 2;
+
+  Serial.print("Distance1: ");
+  Serial.print(distance1);
+  Serial.println(" cm");
+  //
+  Serial.print("Distance2: ");
+  Serial.print(distance2);
+  Serial.println("cm");
+
+  delay(1000);
 }
 
 void loop() {
-  // Send a 10us pulse to trigger measurement
-  digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(2);
-  digitalWrite(TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(TRIG_PIN, LOW);
-
-  // Read the echo pulse
-  long duration = pulseIn(ECHO_PIN, HIGH);
-
-  // Calculate distance in cm (speed of sound: ~343 m/s)
-  distance = duration * 0.0343 / 2;
-
-  Serial.print("Distance: ");
-  Serial.print(distance);
-  Serial.println(" cm");
-
-  delay(1000);
+  sensors();
 }
