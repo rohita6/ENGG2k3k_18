@@ -3,10 +3,17 @@
 #include WiFi.h
 float distance = 0
 
+//SSID of your network
+char ssid[] = "yourNetwork";
+//password of your WPA Network
+char pass[] = "secretPassword";
+
 void setup() {
   Serial.begin(115200);
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
+
+  WiFi.begin(ssid, pass);
 }
 
 void loop() {
