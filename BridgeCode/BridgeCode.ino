@@ -14,6 +14,13 @@ void setup() {
   pinMode(ECHO_PIN, INPUT);
 
   WiFi.begin(ssid, pass);
+
+  Serial.print("Connecting to Wi-Fi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print("This is working");
+  }
+  Serial.println("\nConnected!");
 }
 
 void loop() {
