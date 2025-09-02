@@ -1,71 +1,29 @@
-const int TRIG_PIN1 = 5;
-const int ECHO_PIN1 = 18;
-const int TRIG_PIN2 = 22;
-const int ECHO_PIN2 = 23;
-
 #include <WiFi.h>
-#include <WebServer.h>
 
-const char* ssid = "YourWiFiName";
-const char* password = "YourWiFiPassword";
+
+const int TRIG_PIN1 = 15;
+const int ECHO_PIN1 = 2;
+const int TRIG_PIN2 = 4;
+const int ECHO_PIN2 = 16;
 
 float distance1 = 0;
 float distance2 = 0;
 
-int ledPin = 2;      // GPIO2 onboard LED (blue)
-bool ledState = false;
-int counter = 0;
+//wifi credentials
+const char* ssid = "KaiCenatCentral";
+const char* password = "skibiditoilet";
 
-void handleRoot() {
-  String page = R"rawliteral(
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>ESP32 AJAX Demo</title>
-    </head>
-    <body>
-      <h1>ESP32 AJAX Example</h1>
-      <p>LED State: <span id="led">OFF</span></p>
-      <button onclick="toggleLED()">Toggle LED</button>
-      <p>Counter: <span id="count">0</span></p>
-      <button onclick="getCounter()">Refresh Counter</button>
 
-      <script>
-        function toggleLED() {
-          fetch('/toggle')
-            .then(response => response.text())
-            .then(data => {
-              document.getElementById('led').innerText = data;
-            });
-        }
+WiFiServer server(80);
 
-        function getCounter() {
-          fetch('/counter')
-            .then(response => response.text())
-            .then(data => {
-              document.getElementById('count').innerText = data;
-            });
-        }
-      </script>
-    </body>
-    </html>
-  )rawliteral";
+String output26State = "off";
+String output27State = "off";
 
-  server.send(200, "text/html", page);
-}
+const int output26 = 26;
+const int output27 = 27;
 
-void handleToggle() {  
-  ledState = !ledState;
-  digitalWrite(ledPin, ledState ? HIGH : LOW);
-  server.send(200, "text/plain", ledState ? "ON" : "OFF");
-}
 
-void handleCounter() {
-  counter++;
-  server.send(200, "text/plain", String(counter));
-}
-
-void sensors() {
+void sensors() {//SensorCode
   // Send a 10us pulse to trigger measurement for sensor 1
   digitalWrite(TRIG_PIN1, LOW);
   delayMicroseconds(2);
@@ -97,6 +55,65 @@ void sensors() {
   delay(1000);
 }
 
+String generateButton(int pin, const String& state) {// for WebPage
+  String html = "<p>GPIO " + String(pin) + " - State " + state + "</p>";
+  if (state == "off") {
+    html += "<p><a href=\"/" + String(pin) + "/on\"><button class=\"button\">ON</button></a></p>";
+  } else {
+    html += "<p><a href=\"/" + String(pin) + "/off\"><button class=\"button button2\">OFF</button></a></p>";
+  }
+  return html;
+}
+
+void sendWebPage(WiFiClient& client) {// for WebPage
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-type:text/html");
+  client.println("Connection: close");
+  client.println();
+
+  client.println(R"rawliteral(
+    <!DOCTYPE html><html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <link rel="icon" href="data:,">
+      <style>
+        html { font-family: Helvetica; text-align: center; margin: 0px auto; }
+        .button { background-color: #4CAF50; border: none; color: white; 
+                  padding: 16px 40px; font-size: 30px; cursor: pointer; }
+        .button2 { background-color: #555555; }
+      </style>
+    </head>
+    <body>
+      <h1>ESP32 Web Server</h1>
+  )rawliteral");
+
+  client.println(generateButton(output26, output26State));
+  client.println(generateButton(output27, output27State));
+
+  client.println(R"rawliteral(
+    </body></html>
+  )rawliteral");
+
+  client.println(); // End of HTTP response
+}
+
+void handleRequest(String& header, WiFiClient& client) {// for WebPage
+  if (header.indexOf("GET /26/on") >= 0) {
+    output26State = "on";
+    digitalWrite(output26, HIGH);
+  } else if (header.indexOf("GET /26/off") >= 0) {
+    output26State = "off";
+    digitalWrite(output26, LOW);
+  } else if (header.indexOf("GET /27/on") >= 0) {
+    output27State = "on";
+    digitalWrite(output27, HIGH);
+  } else if (header.indexOf("GET /27/off") >= 0) {
+    output27State = "off";
+    digitalWrite(output27, LOW);
+  }
+  sendWebPage(client);
+}
+
 void setup() {
   Serial.begin(115200);
   pinMode(TRIG_PIN1, OUTPUT);//Sensors
@@ -104,28 +121,42 @@ void setup() {
   pinMode(TRIG_PIN2, OUTPUT);
   pinMode(ECHO_PIN2, INPUT);
 
-  Serial.begin(115200);
-  pinMode(ledPin, OUTPUT);
+  pinMode(output26, OUTPUT);
+  pinMode(output27, OUTPUT);
+  // Set outputs to LOW
+  digitalWrite(output26, LOW);
+  digitalWrite(output27, LOW);
 
-  WiFi.begin(ssid, password); // connect to wifi
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.print("Connected to WiFi! IP address: ");
-  Serial.println(WiFi.localIP());
+  Serial.print("Setting Access Point");
+  // Remove the password parameter, if you want the AP (Access Point) to be open
+  WiFi.softAP(ssid, password);
 
-  // Define routes
-  server.on("/", handleRoot);
-  server.on("/toggle", handleToggle);
-  server.on("/counter", handleCounter);
+  IPAddress IP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.print(IP);
 
   server.begin();
 }
 
-
+unsigned long previousTime = 0;
+const long interval = 500; // run every 500ms
 
 void loop() {
-  sensors();//ping sensors
-  server.handleClient();
+  unsigned long currentTime = millis();
+
+  WiFiClient client = server.available();
+  if (client) {
+      String header = "";
+      while (client.connected() && client.available()) {
+        char c = client.read();
+        header += c;
+      }
+      if (header.length() > 0) handleRequest(header, client);
+      client.stop();  
+  }
+  if (currentTime - previousTime >= interval) {
+      previousTime = currentTime;
+      sensors();
+  }
+
 }
