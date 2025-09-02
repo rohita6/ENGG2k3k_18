@@ -94,6 +94,14 @@ void sensors() {
   Serial.print(distance2);
   Serial.println("cm");
 
+ //  LED control based on distance
+  if (distance1 > 0 && distance1 < 50 || distance2 > 0 && distance2 < 50) {
+    digitalWrite(ledPin, HIGH);   // Turn LED ON
+  } else {
+    digitalWrite(ledPin, LOW);    // Turn LED OFF
+  }
+
+
   delay(1000);
 }
 
