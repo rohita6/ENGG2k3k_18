@@ -1,9 +1,9 @@
 #include <WiFi.h>
 
 
-const int TRIG_PIN1 = 15;
+const int TRIG_PIN1 = 15; //Sensor 1
 const int ECHO_PIN1 = 2;
-const int TRIG_PIN2 = 4;
+const int TRIG_PIN2 = 4; //Sensor 2
 const int ECHO_PIN2 = 16;
 
 float distance1 = 0;
@@ -11,7 +11,7 @@ float distance2 = 0;
 
 //wifi credentials
 const char* ssid = "KaiCenatCentral";
-const char* password = "skibiditoilet";
+const char* password = "123";
 
 
 WiFiServer server(80);
@@ -22,6 +22,7 @@ String output27State = "off";
 const int output26 = 26;
 const int output27 = 27;
 
+bool shipDetected = false;
 
 void sensors() {//SensorCode
   // Send a 10us pulse to trigger measurement for sensor 1
@@ -53,17 +54,18 @@ void sensors() {//SensorCode
   Serial.println("cm");
 
  // LED control based on distance
-  if (distance1 > 0 && distance1 < 50 || distance2 > 0 && distance2 < 50) {
-    digitalWrite(ledPin, HIGH);   // Turn LED ON
+  if (distance1 < 50 || distance2 < 50) { // sensor can only return signed integers
+    //digitalWrite(ledPin, HIGH);   // Turn LED ON
+    shipDetected = true;
   } else {
-    digitalWrite(ledPin, LOW);    // Turn LED OFF
+    //digitalWrite(ledPin, LOW);    // Turn LED OFF
   }
 
   delay(1000);
 }
 
 String generateButton(int pin, const String& state) {// for WebPage
-  String html = "<p>GPIO " + String(pin) + " - State " + state + "</p>";
+  String html = "<p>PIN " + String(pin) + " - State " + state + "</p>";
   if (state == "off") {
     html += "<p><a href=\"/" + String(pin) + "/on\"><button class=\"button\">ON</button></a></p>";
   } else {
@@ -85,9 +87,9 @@ void sendWebPage(WiFiClient& client) {// for WebPage
       <link rel="icon" href="data:,">
       <style>
         html { font-family: Helvetica; text-align: center; margin: 0px auto; }
-        .button { background-color: #4CAF50; border: none; color: white; 
+        .button { background-color: #00ff37; border: none; color: white; 
                   padding: 16px 40px; font-size: 30px; cursor: pointer; }
-        .button2 { background-color: #555555; }
+        .button2 { background-color: #ff0019; }
       </style>
     </head>
     <body>
@@ -96,6 +98,9 @@ void sendWebPage(WiFiClient& client) {// for WebPage
 
   client.println(generateButton(output26, output26State));
   client.println(generateButton(output27, output27State));
+
+  if (shipDetected) {client.println("<p> Ship Detected <span style=\"color: green;\">True</span></p>");
+  } else { client.println("<p> Ship Detected <span style=\"color: red;\">False</span></p>");}
 
   client.println(R"rawliteral(
     </body></html>
@@ -163,7 +168,7 @@ void loop() {
   }
   if (currentTime - previousTime >= interval) {
       previousTime = currentTime;
-      sensors();
+      sensors(); // run se
   }
 
 }
