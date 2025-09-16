@@ -6,8 +6,8 @@
     - Ultrasonic: TRIG -> GPIO 5, ECHO -> GPIO 18
 */
 
-#define TRIG_PIN 5
-#define ECHO_PIN 18
+#define TRIG_PIN 32
+#define ECHO_PIN 33
 
 #define ENA 2
 #define IN1 4
@@ -17,13 +17,13 @@
 void openBridge() { 
   digitalWrite(IN1, HIGH);
   digitalWrite(IN2, LOW);
-  analogWrite(ENA, 200);  // PWM speed control (0–255)
+  analogWrite(ENA, 50);  // PWM speed control (0–255)
 }
 
 void closeBridge() {
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, HIGH);
-  analogWrite(ENA, 200);
+  analogWrite(ENA, 50);
 }
 
 void stopMotor() {
