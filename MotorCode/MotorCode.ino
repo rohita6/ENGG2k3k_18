@@ -75,3 +75,46 @@ void loop() {
 
   delay(500); // wait before next reading
 }
+/* ///For MVP
+#define ENA 2
+#define IN1 4
+#define IN2 16
+
+void setup() {
+  // Motor driver pins
+  pinMode(ENA, OUTPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+
+  stopMotor(); // start stopped
+}
+
+void loop() {
+  // Forward (open bridge)
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  analogWrite(ENA, 200);   // adjust speed (0–255)
+  delay(5000);             // run 5s
+
+  // Stop
+  stopMotor();
+  delay(5000);             // wait 5s
+
+  // Backward (close bridge)
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  analogWrite(ENA, 200);
+  delay(5000);             // run 5s
+
+  // Stop again
+  stopMotor();
+  delay(5000);             // wait 5s before repeating
+}
+
+// Function to stop motor
+void stopMotor() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  analogWrite(ENA, 0);
+}
+*/
