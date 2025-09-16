@@ -12,6 +12,10 @@
 #define ENA 2
 #define IN1 4
 #define IN2 16
+#include <WiFi.h>
+// GPIO pins
+const int redLED = 26;   // Red LED connected to GPIO 26
+const int blueLED = 27;  // Blue LED connected to GPIO 27
 
 // Motor control functions
 void openBridge() { 
@@ -43,7 +47,13 @@ void setup() {
   pinMode(ENA, OUTPUT);
   pinMode(IN1, OUTPUT);
   pinMode(IN2, OUTPUT);
-
+  //LED setup
+  pinMode(redLED, OUTPUT);
+  pinMode(blueLED, OUTPUT);
+  // Initial state
+  digitalWrite(redLED, LOW);
+  digitalWrite(blueLED, LOW);
+    
   stopMotor(); // make sure motor is stopped initially
 }
 
@@ -65,16 +75,31 @@ void loop() {
   // --- Control logic ---
   if (distance > 0 && distance < 50) { 
     Serial.println("Ship approaching, opening bridge...");
+    shipDetected = true;
+    LEDloop(); // update LEDs based on shipDetected
     openBridge();
   } else if (distance > 100) { 
     Serial.println("Ship has passed, closing bridge...");
     closeBridge();
+    shipDetected = false;
+    LEDloop(); 
   } else {
     stopMotor();
   }
 
   delay(500); // wait before next reading
 }
+
+void LEDloop(){
+  if (shipDetected) {
+    digitalWrite(redLED, HIGH);
+    digitalWrite(blueLED, LOW);
+  } else {
+    digitalWrite(blueLED, HIGH);
+    digitalWrite(redLED, LOW);
+  }
+}
+
 /* ///For MVP
 #define ENA 2
 #define IN1 4
