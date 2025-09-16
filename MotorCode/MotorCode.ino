@@ -17,6 +17,7 @@
 const int redLED = 26;   // Red LED connected to GPIO 26
 const int blueLED = 27;  // Blue LED connected to GPIO 27
 
+bool shipDetected = false;
 // Motor control functions
 void openBridge() { 
   digitalWrite(IN1, HIGH);
