@@ -1,43 +1,69 @@
 #include <WiFi.h>
 
+int count = 0;
 
-const int TRIG_PIN1 = 15; //Sensor 1
-const int ECHO_PIN1 = 2;
-const int TRIG_PIN2 = 4; //Sensor 2
-const int ECHO_PIN2 = 16;
+const int TRIG_PIN1 = 32; //Sensor 1
+const int ECHO_PIN1 = 33;
+const int TRIG_PIN2 = 34; //Sensor 2
+const int ECHO_PIN2 = 35;                                                                                               ;
+const int ENA = 2;
+const int IN1 = 4;
+const int IN2 = 16;
+const int output26 = 26; //RED LED
+const int output27 = 27; //BLUE LED
 
 float distance1 = 0;
 float distance2 = 0;
 
 //wifi credentials
-const char* ssid = "KaiCenatCentral";
+const char* ssid = "Group_18_AP";
 const char* password = "123";
 
 
 WiFiServer server(80);
 
 String output26State = "off";
-String output27State = "off";
 
-const int output26 = 26;
-const int output27 = 27;
+
+
+
 
 bool shipDetected = false;
+// Motor control functions
+void openBridge() { 
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  analogWrite(ENA, 50);  // PWM speed control (0–255)
+}
+
+void closeBridge() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  analogWrite(ENA, 50);
+}
+
+void stopMotor() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  analogWrite(ENA, 0);
+}
 
 void sensors() {//SensorCode
-  // Send a 10us pulse to trigger measurement for sensor 1
+  // Clear the trigger PIN
   digitalWrite(TRIG_PIN1, LOW);
   delayMicroseconds(2);
+  // Send pulse for 10 ms
   digitalWrite(TRIG_PIN1, HIGH);
   delayMicroseconds(10);
   digitalWrite(TRIG_PIN1, LOW);
-  // Send a 10us pulse to trigger measurement for sensor 2
+  //Send a 10us pulse to trigger measurement for sensor 2
   digitalWrite(TRIG_PIN2, LOW);
   delayMicroseconds(2);
+  //Sendpulse
   digitalWrite(TRIG_PIN2, HIGH);
   delayMicroseconds(10);
   digitalWrite(TRIG_PIN2, LOW);
-  // Read the echo pulse
+  //Read the echo pulse
   long duration1 = pulseIn(ECHO_PIN1, HIGH);
   long duration2 = pulseIn(ECHO_PIN2, HIGH);
 
@@ -45,32 +71,33 @@ void sensors() {//SensorCode
   distance1 = duration1 * 0.0343 / 2;
   distance2 = duration2 * 0.0343 / 2;
 
-  Serial.print("Distance1: ");
+  Serial.print("Distance1/");
+  Serial.print(count);
+  Serial.print(": ");
   Serial.print(distance1);
-  Serial.println(" cm");
-  //
+  Serial.println("cm");
+  
   Serial.print("Distance2: ");
   Serial.print(distance2);
   Serial.println("cm");
 
- // LED control based on distance
-  if (distance1 < 50 || distance2 < 50) { // sensor can only return signed integers
-    //digitalWrite(ledPin, HIGH);   // Turn LED ON
-    shipDetected = true;
-  } else {
-    //digitalWrite(ledPin, LOW);    // Turn LED OFF
-  }
-
+  // LED control based on distance
+  // if (distance1 < 50 || distance2 < 50) { // sensor can only return signed integers
+  //   digitalWrite(ledPin, HIGH);   // Turn LED ON
+  //   shipDetected = true;
+  // } else {
+  //   digitalWrite(ledPin, LOW);    // Turn LED OFF
+  // }
+  count++;
   delay(1000);
+  
 }
 
-String generateButton(int pin, const String& state) {// for WebPage
+String generateButton(int pin, const String& state) { // for WebPage
   String html = "<p>PIN " + String(pin) + " - State " + state + "</p>";
-  if (state == "off") {
-    html += "<p><a href=\"/" + String(pin) + "/on\"><button class=\"button\">ON</button></a></p>";
-  } else {
-    html += "<p><a href=\"/" + String(pin) + "/off\"><button class=\"button button2\">OFF</button></a></p>";
-  }
+  String nextAction = (state == "CLOSE") ? "OPEN" : "CLOSE";
+  String buttonColor = (state == "CLOSE") ? "button" : "button button2";
+  html += "<p><a href=\"/" + String(pin) + "/" + nextAction + "\"><button class=\"" + buttonColor + "\">" + nextAction + "</button></a></p>";
   return html;
 }
 
@@ -97,7 +124,7 @@ void sendWebPage(WiFiClient& client) {// for WebPage
   )rawliteral");
 
   client.println(generateButton(output26, output26State));
-  client.println(generateButton(output27, output27State));
+  
 
   if (shipDetected) {client.println("<p> Ship Detected <span style=\"color: green;\">True</span></p>");
   } else { client.println("<p> Ship Detected <span style=\"color: red;\">False</span></p>");}
@@ -109,20 +136,20 @@ void sendWebPage(WiFiClient& client) {// for WebPage
   client.println(); // End of HTTP response
 }
 
-void handleRequest(String& header, WiFiClient& client) {// for WebPage
-  if (header.indexOf("GET /26/on") >= 0) {
-    output26State = "on";
+void handleRequest(String& header, WiFiClient& client) { // for WebPage
+  if (header.indexOf("GET /26/OPEN") >= 0) {
+    output26State = "OPEN";
     digitalWrite(output26, HIGH);
-  } else if (header.indexOf("GET /26/off") >= 0) {
-    output26State = "off";
-    digitalWrite(output26, LOW);
-  } else if (header.indexOf("GET /27/on") >= 0) {
-    output27State = "on";
-    digitalWrite(output27, HIGH);
-  } else if (header.indexOf("GET /27/off") >= 0) {
-    output27State = "off";
     digitalWrite(output27, LOW);
+    openBridge();
+  } 
+  else if (header.indexOf("GET /26/CLOSE") >= 0) {
+    output26State = "CLOSE";
+    digitalWrite(output26, LOW);
+    digitalWrite(output27, HIGH);
+    closeBridge();
   }
+
   sendWebPage(client);
 }
 
@@ -135,27 +162,38 @@ void setup() {
 
   pinMode(output26, OUTPUT);
   pinMode(output27, OUTPUT);
+
+  //Sets up good LEDs
+  pinMode(output26, OUTPUT);
+  pinMode(output27, OUTPUT);
   // Set outputs to LOW
   digitalWrite(output26, LOW);
   digitalWrite(output27, LOW);
 
+  // Sets up Motor Pins
+  pinMode(ENA, OUTPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  // Begin Wifi Access Point
   Serial.print("Setting Access Point");
-  // Remove the password parameter, if you want the AP (Access Point) to be open
+  // Username and Password
   WiFi.softAP(ssid, password);
-
   IPAddress IP = WiFi.softAPIP();
   Serial.print("AP IP address: ");
   Serial.print(IP);
+
+  //Make sure motor is stopped initially
+  stopMotor();
 
   server.begin();
 }
 
 unsigned long previousTime = 0;
-const long interval = 500; // run every 500ms
+const long interval = 500; 
 
 void loop() {
   unsigned long currentTime = millis();
-
+  
   WiFiClient client = server.available();
   if (client) {
       String header = "";
@@ -166,9 +204,26 @@ void loop() {
       if (header.length() > 0) handleRequest(header, client);
       client.stop();  
   }
-  if (currentTime - previousTime >= interval) {
-      previousTime = currentTime;
-      sensors(); // run se
+  // --- Control logic ---
+  if (distance1 > 0 && distance1 < 50 ||distance2 > 0 && distance2 < 50) { 
+    Serial.println("Ship approaching, opening bridge...");
+    shipDetected = true;
+    digitalWrite(output26, HIGH);
+    digitalWrite(output27, LOW);
+    openBridge();
+  } else if (distance1 > 100 || distance2 >100) { 
+    Serial.println("Ship has passed or no ship detected");
+    closeBridge();
+    shipDetected = false;
+    digitalWrite(output26, LOW);
+    digitalWrite(output27, HIGH);
+  } else {
+    stopMotor();
+  }
+  // Sensor check
+  if (currentTime - previousTime >= interval) { // run every 500ms
+    previousTime = currentTime;
+    sensors();
   }
 
 }

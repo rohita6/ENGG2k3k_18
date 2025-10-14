@@ -22,7 +22,7 @@ bool shipDetected = false;
 void openBridge() { 
   digitalWrite(IN1, HIGH);
   digitalWrite(IN2, LOW);
-  analogWrite(ENA, 50);  // PWM speed control (0–255)
+  analogWrite(ENA, 150);  // PWM speed control (0–255)
 }
 
 void closeBridge() {
@@ -58,6 +58,16 @@ void setup() {
   stopMotor(); // make sure motor is stopped initially
 }
 
+void LEDloop(){
+  if (shipDetected) {
+    digitalWrite(redLED, HIGH);
+    digitalWrite(blueLED, LOW);
+  } else {
+    digitalWrite(blueLED, HIGH);
+    digitalWrite(redLED, LOW);
+  }
+}
+
 void loop() {
   // --- Ultrasonic sensor measurement ---
   digitalWrite(TRIG_PIN, LOW);
@@ -91,15 +101,7 @@ void loop() {
   delay(500); // wait before next reading
 }
 
-void LEDloop(){
-  if (shipDetected) {
-    digitalWrite(redLED, HIGH);
-    digitalWrite(blueLED, LOW);
-  } else {
-    digitalWrite(blueLED, HIGH);
-    digitalWrite(redLED, LOW);
-  }
-}
+
 
 /* ///For MVP
 #define ENA 2
