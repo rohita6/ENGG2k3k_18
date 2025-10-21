@@ -2,15 +2,19 @@
 
 int count = 0;
 
-const int TRIG_PIN1 = 32; //Sensor 1
+const int TRIG_PIN1 = 32;  //Sensor 1
 const int ECHO_PIN1 = 33;
-const int TRIG_PIN2 = 34; //Sensor 2
-const int ECHO_PIN2 = 35;                                                                                               ;
+const int TRIG_PIN2 = 34;  //Sensor 2
+const int ECHO_PIN2 = 35;
+;
 const int ENA = 2;
 const int IN1 = 4;
 const int IN2 = 16;
-const int output26 = 26; //RED LED
-const int output27 = 27; //BLUE LED
+const int output26 = 26;  //RED LED
+const int output27 = 27;  //BLUE LED
+
+bool manualOverride = false;
+bool manualMode = false;
 
 float distance1 = 0;
 float distance2 = 0;
@@ -19,18 +23,16 @@ float distance2 = 0;
 const char* ssid = "Group_18_AP";
 const char* password = "123";
 
+unsigned long previousTime = 0;
+const long interval = 500;
 
 WiFiServer server(80);
 
-String output26State = "off";
-
-
-
-
+String output26State = "CLOSE";
 
 bool shipDetected = false;
 // Motor control functions
-void openBridge() { 
+void openBridge() {
   digitalWrite(IN1, HIGH);
   digitalWrite(IN2, LOW);
   analogWrite(ENA, 50);  // PWM speed control (0–255)
@@ -48,7 +50,7 @@ void stopMotor() {
   analogWrite(ENA, 0);
 }
 
-void sensors() {//SensorCode
+void sensors() {  //SensorCode
   // Clear the trigger PIN
   digitalWrite(TRIG_PIN1, LOW);
   delayMicroseconds(2);
@@ -76,7 +78,7 @@ void sensors() {//SensorCode
   Serial.print(": ");
   Serial.print(distance1);
   Serial.println("cm");
-  
+
   Serial.print("Distance2: ");
   Serial.print(distance2);
   Serial.println("cm");
@@ -89,19 +91,25 @@ void sensors() {//SensorCode
   //   digitalWrite(ledPin, LOW);    // Turn LED OFF
   // }
   count++;
-  delay(1000);
-  
 }
 
-String generateButton(int pin, const String& state) { // for WebPage
-  String html = "<p>PIN " + String(pin) + " - State " + state + "</p>";
+String generateControls(int pin, const String& state) {  // for WebPage
+  String html = "<p>PIN " + String(pin) + " - Bridge Status " + state + "</p>";
+  //State Button
   String nextAction = (state == "CLOSE") ? "OPEN" : "CLOSE";
   String buttonColor = (state == "CLOSE") ? "button" : "button button2";
   html += "<p><a href=\"/" + String(pin) + "/" + nextAction + "\"><button class=\"" + buttonColor + "\">" + nextAction + "</button></a></p>";
+
+  //Manual Override Button
+  String modeText = manualMode ? "MANUAL" : "AUTO";
+  String nextMode = manualMode ? "AUTO" : "MANUAL";
+  String modeColor = manualMode ? "button button2" : "button";
+  html += "<p><a href=\"/MODE/" + nextMode + "\"><button class=\"" + modeColor + "\">" + nextMode + " MODE</button></a></p>";
+
   return html;
 }
 
-void sendWebPage(WiFiClient& client) {// for WebPage
+void sendWebPage(WiFiClient& client) {
   client.println("HTTP/1.1 200 OK");
   client.println("Content-type:text/html");
   client.println("Connection: close");
@@ -123,45 +131,57 @@ void sendWebPage(WiFiClient& client) {// for WebPage
       <h1>ESP32 Web Server</h1>
   )rawliteral");
 
-  client.println(generateButton(output26, output26State));
-  
+  // Bridge control button
+  client.println(generateControls(output26, output26State));
 
-  if (shipDetected) {client.println("<p> Ship Detected <span style=\"color: green;\">True</span></p>");
-  } else { client.println("<p> Ship Detected <span style=\"color: red;\">False</span></p>");}
+
+  // Ship detection info
+  if (shipDetected) {
+    client.println("<p> Ship Detected <span style=\"color: green;\">True</span></p>");
+  } else {
+    client.println("<p> Ship Detected <span style=\"color: red;\">False</span></p>");
+  }
 
   client.println(R"rawliteral(
     </body></html>
   )rawliteral");
 
-  client.println(); // End of HTTP response
+  client.println();
 }
 
-void handleRequest(String& header, WiFiClient& client) { // for WebPage
+void handleRequest(String& header, WiFiClient& client) {  // for WebPage
   if (header.indexOf("GET /26/OPEN") >= 0) {
     output26State = "OPEN";
     digitalWrite(output26, HIGH);
     digitalWrite(output27, LOW);
     openBridge();
-  } 
-  else if (header.indexOf("GET /26/CLOSE") >= 0) {
+    manualOverride = true;
+  } else if (header.indexOf("GET /26/CLOSE") >= 0) {
     output26State = "CLOSE";
     digitalWrite(output26, LOW);
     digitalWrite(output27, HIGH);
     closeBridge();
+    manualOverride = true;
   }
 
+  else if (header.indexOf("GET /MODE/MANUAL") >= 0) {
+    manualMode = true;
+    manualOverride = true;
+    Serial.println("Switched to MANUAL mode.");
+  } else if (header.indexOf("GET /MODE/AUTO") >= 0) {
+    manualMode = false;
+    manualOverride = false;
+    Serial.println("Switched to AUTO mode.");
+  }
   sendWebPage(client);
 }
 
 void setup() {
   Serial.begin(115200);
-  pinMode(TRIG_PIN1, OUTPUT);//Sensors
+  pinMode(TRIG_PIN1, OUTPUT);  //Sensors
   pinMode(ECHO_PIN1, INPUT);
   pinMode(TRIG_PIN2, OUTPUT);
   pinMode(ECHO_PIN2, INPUT);
-
-  pinMode(output26, OUTPUT);
-  pinMode(output27, OUTPUT);
 
   //Sets up good LEDs
   pinMode(output26, OUTPUT);
@@ -180,7 +200,7 @@ void setup() {
   WiFi.softAP(ssid, password);
   IPAddress IP = WiFi.softAPIP();
   Serial.print("AP IP address: ");
-  Serial.print(IP);
+  Serial.println(IP);
 
   //Make sure motor is stopped initially
   stopMotor();
@@ -188,42 +208,42 @@ void setup() {
   server.begin();
 }
 
-unsigned long previousTime = 0;
-const long interval = 500; 
+
 
 void loop() {
   unsigned long currentTime = millis();
-  
+
   WiFiClient client = server.available();
   if (client) {
-      String header = "";
-      while (client.connected() && client.available()) {
-        char c = client.read();
-        header += c;
-      }
-      if (header.length() > 0) handleRequest(header, client);
-      client.stop();  
+    String header = "";
+    while (client.connected() && client.available()) {
+      char c = client.read();
+      header += c;
+    }
+    if (header.length() > 0) handleRequest(header, client);
+    client.stop();
   }
   // --- Control logic ---
-  if (distance1 > 0 && distance1 < 50 ||distance2 > 0 && distance2 < 50) { 
-    Serial.println("Ship approaching, opening bridge...");
-    shipDetected = true;
-    digitalWrite(output26, HIGH);
-    digitalWrite(output27, LOW);
-    openBridge();
-  } else if (distance1 > 100 || distance2 >100) { 
-    Serial.println("Ship has passed or no ship detected");
-    closeBridge();
-    shipDetected = false;
-    digitalWrite(output26, LOW);
-    digitalWrite(output27, HIGH);
-  } else {
-    stopMotor();
+  if (!manualMode) {
+    if (distance1 > 0 && distance1 < 50 || distance2 > 0 && distance2 < 50) {
+      Serial.println("Ship approaching, opening bridge...");
+      shipDetected = true;
+      digitalWrite(output26, HIGH);
+      digitalWrite(output27, LOW);
+      openBridge();
+    } else if (distance1 > 100 || distance2 > 100) {
+      Serial.println("Ship has passed or no ship detected");
+      closeBridge();
+      shipDetected = false;
+      digitalWrite(output26, LOW);
+      digitalWrite(output27, HIGH);
+    } else {
+      stopMotor();
+    }
   }
   // Sensor check
-  if (currentTime - previousTime >= interval) { // run every 500ms
+  if (currentTime - previousTime >= interval) {  // run every 500ms
     previousTime = currentTime;
     sensors();
   }
-
 }
