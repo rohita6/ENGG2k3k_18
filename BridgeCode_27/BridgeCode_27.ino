@@ -1,11 +1,10 @@
 #include <WiFi.h>
 
-int count = 0;
 
 const int TRIG_PIN1 = 32;  //Sensor 1
 const int ECHO_PIN1 = 33;
-const int TRIG_PIN2 = 34;  //Sensor 2
-const int ECHO_PIN2 = 35;
+const int TRIG_PIN2 = 18;  //Sensor 2
+const int ECHO_PIN2 = 19;
 ;
 const int ENA = 2;
 const int IN1 = 4;
@@ -23,8 +22,17 @@ float distance2 = 0;
 const char* ssid = "Group_18_AP";
 const char* password = "123";
 
-unsigned long previousTime = 0;
-const long interval = 500;
+unsigned long previousTime = 0; //For Void Loop
+
+bool bridgeOpening = false;
+unsigned long openStartTime = 0; //For bridge opening
+
+bool bridgeStopping = false;
+unsigned long openStopTime = 0; //For bridge stopping
+
+bool bridgeClosing = false;
+unsigned long openCloseTime = 0; //For bridge closing
+
 
 WiFiServer server(80);
 
@@ -36,32 +44,71 @@ void openBridge() {
   digitalWrite(IN1, HIGH);
   digitalWrite(IN2, LOW);
   analogWrite(ENA, 50);  // PWM speed control (0–255)
+  bridgeOpening = true;
+  bridgeStopping = false;
+  bridgeClosing = false;
+  openStartTime = millis(); // mark the start
 }
 
 void closeBridge() {
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, HIGH);
   analogWrite(ENA, 50);
+  bridgeOpening = false;
+  bridgeStopping = false;
+  bridgeClosing = true;
+  openCloseTime = millis(); // mark the start
 }
 
 void stopMotor() {
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, LOW);
   analogWrite(ENA, 0);
+  bridgeOpening = false;
+  bridgeStopping = true;
+  bridgeClosing = false;
+  openStopTime = millis(); // mark the start
+}
+
+void bridgeControl(){
+  if (distance1 > 0 && distance1 < 100 || distance2 > 0 && distance2 < 100) { //Open Bridge
+    shipDetected = true;
+    digitalWrite(output26, HIGH);//Red
+    digitalWrite(output27, LOW);
+    openBridge();
+  } 
+  
+  else if (bridgeOpening && (millis() - openStartTime >= 3000)) { //Stop the bridge when its been opening for 3 seconds
+    stopMotor();
+    digitalWrite(output26, HIGH);//Red
+    digitalWrite(output27, LOW);
+  }
+  else if (bridgeStopping && (millis() - openCloseTime >= 3000)) { //Close the bridge when its been stopping for 3 seconds
+    closeBridge();
+    digitalWrite(output26, HIGH);//Red
+    digitalWrite(output27, LOW);
+  }
+  else if (bridgeClosing && (millis() - openCloseTime >= 3000)) { //Stop the bridge when its been closing for 3 seconds
+    stopMotor();
+    digitalWrite(output26, LOW);//Red
+    digitalWrite(output27, HIGH);
+    shipDetected = false;
+  }
 }
 
 void sensors() {  //SensorCode
-  // Clear the trigger PIN
+  // Clear the trigger PINs
   digitalWrite(TRIG_PIN1, LOW);
   delayMicroseconds(2);
-  // Send pulse for 10 ms
+  digitalWrite(TRIG_PIN2, LOW);
+  delayMicroseconds(2);
+
+  //Send a 10us pulse to trigger measurement for sensor 1
   digitalWrite(TRIG_PIN1, HIGH);
   delayMicroseconds(10);
   digitalWrite(TRIG_PIN1, LOW);
+
   //Send a 10us pulse to trigger measurement for sensor 2
-  digitalWrite(TRIG_PIN2, LOW);
-  delayMicroseconds(2);
-  //Sendpulse
   digitalWrite(TRIG_PIN2, HIGH);
   delayMicroseconds(10);
   digitalWrite(TRIG_PIN2, LOW);
@@ -73,24 +120,13 @@ void sensors() {  //SensorCode
   distance1 = duration1 * 0.0343 / 2;
   distance2 = duration2 * 0.0343 / 2;
 
-  Serial.print("Distance1/");
-  Serial.print(count);
-  Serial.print(": ");
+  Serial.print("Distance1: ");
   Serial.print(distance1);
   Serial.println("cm");
 
   Serial.print("Distance2: ");
   Serial.print(distance2);
   Serial.println("cm");
-
-  // LED control based on distance
-  // if (distance1 < 50 || distance2 < 50) { // sensor can only return signed integers
-  //   digitalWrite(ledPin, HIGH);   // Turn LED ON
-  //   shipDetected = true;
-  // } else {
-  //   digitalWrite(ledPin, LOW);    // Turn LED OFF
-  // }
-  count++;
 }
 
 String generateControls(int pin, const String& state) {  // for WebPage
@@ -163,12 +199,12 @@ void handleRequest(String& header, WiFiClient& client) {  // for WebPage
     closeBridge();
     manualOverride = true;
   }
-
   else if (header.indexOf("GET /MODE/MANUAL") >= 0) {
     manualMode = true;
     manualOverride = true;
     Serial.println("Switched to MANUAL mode.");
-  } else if (header.indexOf("GET /MODE/AUTO") >= 0) {
+  } 
+  else if (header.indexOf("GET /MODE/AUTO") >= 0) {
     manualMode = false;
     manualOverride = false;
     Serial.println("Switched to AUTO mode.");
@@ -211,7 +247,6 @@ void setup() {
 
 
 void loop() {
-  unsigned long currentTime = millis();
 
   WiFiClient client = server.available();
   if (client) {
@@ -225,25 +260,11 @@ void loop() {
   }
   // --- Control logic ---
   if (!manualMode) {
-    if (distance1 > 0 && distance1 < 50 || distance2 > 0 && distance2 < 50) {
-      Serial.println("Ship approaching, opening bridge...");
-      shipDetected = true;
-      digitalWrite(output26, HIGH);
-      digitalWrite(output27, LOW);
-      openBridge();
-    } else if (distance1 > 100 || distance2 > 100) {
-      Serial.println("Ship has passed or no ship detected");
-      closeBridge();
-      shipDetected = false;
-      digitalWrite(output26, LOW);
-      digitalWrite(output27, HIGH);
-    } else {
-      stopMotor();
-    }
+    bridgeControl();
   }
   // Sensor check
-  if (currentTime - previousTime >= interval) {  // run every 500ms
-    previousTime = currentTime;
+  if (millis() - previousTime >= 500) {  // run every 500ms
+    previousTime = millis();
     sensors();
   }
 }

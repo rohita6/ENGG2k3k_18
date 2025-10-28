@@ -6,143 +6,34 @@
     - Ultrasonic: TRIG -> GPIO 5, ECHO -> GPIO 18
 */
 
-#define TRIG_PIN 32
-#define ECHO_PIN 33
 
 #define ENA 2
 #define IN1 4
 #define IN2 16
 #include <WiFi.h>
 // GPIO pins
-const int redLED = 26;   // Red LED connected to GPIO 26
-const int blueLED = 27;  // Blue LED connected to GPIO 27
 
-bool shipDetected = false;
-// Motor control functions
-void openBridge() { 
-  digitalWrite(IN1, HIGH);
-  digitalWrite(IN2, LOW);
-  analogWrite(ENA, 150);  // PWM speed control (0–255)
-}
 
-void closeBridge() {
-  digitalWrite(IN1, LOW);
-  digitalWrite(IN2, HIGH);
-  analogWrite(ENA, 50);
-}
 
-void stopMotor() {
-  digitalWrite(IN1, LOW);
-  digitalWrite(IN2, LOW);
-  analogWrite(ENA, 0);
-}
+
+
 
 void setup() {
   Serial.begin(115200);
 
-  // Sensor pins
-  pinMode(TRIG_PIN, OUTPUT);
-  pinMode(ECHO_PIN, INPUT);
+
 
   // Motor driver pins
   pinMode(ENA, OUTPUT);
   pinMode(IN1, OUTPUT);
   pinMode(IN2, OUTPUT);
   //LED setup
-  pinMode(redLED, OUTPUT);
-  pinMode(blueLED, OUTPUT);
-  // Initial state
-  digitalWrite(redLED, LOW);
-  digitalWrite(blueLED, LOW);
-    
-  stopMotor(); // make sure motor is stopped initially
+
 }
 
-void LEDloop(){
-  if (shipDetected) {
-    digitalWrite(redLED, HIGH);
-    digitalWrite(blueLED, LOW);
-  } else {
-    digitalWrite(blueLED, HIGH);
-    digitalWrite(redLED, LOW);
-  }
-}
 
 void loop() {
-  // --- Ultrasonic sensor measurement ---
-  digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(2);
-  digitalWrite(TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(TRIG_PIN, LOW);
-  
-  long duration = pulseIn(ECHO_PIN, HIGH);
-  float distance = duration * 0.0343 / 2;
-
-  Serial.print("Distance: ");
-  Serial.print(distance);
-  Serial.println(" cm");
-
-  // --- Control logic ---
-  if (distance > 0 && distance < 50) { 
-    Serial.println("Ship approaching, opening bridge...");
-    shipDetected = true;
-    LEDloop(); // update LEDs based on shipDetected
-    openBridge();
-  } else if (distance > 100) { 
-    Serial.println("Ship has passed, closing bridge...");
-    closeBridge();
-    shipDetected = false;
-    LEDloop(); 
-  } else {
-    stopMotor();
-  }
-
-  delay(500); // wait before next reading
-}
-
-
-
-/* ///For MVP
-#define ENA 2
-#define IN1 4
-#define IN2 16
-
-void setup() {
-  // Motor driver pins
-  pinMode(ENA, OUTPUT);
-  pinMode(IN1, OUTPUT);
-  pinMode(IN2, OUTPUT);
-
-  stopMotor(); // start stopped
-}
-
-void loop() {
-  // Forward (open bridge)
   digitalWrite(IN1, HIGH);
   digitalWrite(IN2, LOW);
-  analogWrite(ENA, 200);   // adjust speed (0–255)
-  delay(5000);             // run 5s
-
-  // Stop
-  stopMotor();
-  delay(5000);             // wait 5s
-
-  // Backward (close bridge)
-  digitalWrite(IN1, LOW);
-  digitalWrite(IN2, HIGH);
-  analogWrite(ENA, 200);
-  delay(5000);             // run 5s
-
-  // Stop again
-  stopMotor();
-  delay(5000);             // wait 5s before repeating
+  analogWrite(ENA, 150); 
 }
-
-// Function to stop motor
-void stopMotor() {
-  digitalWrite(IN1, LOW);
-  digitalWrite(IN2, LOW);
-  analogWrite(ENA, 0);
-}
-*/
