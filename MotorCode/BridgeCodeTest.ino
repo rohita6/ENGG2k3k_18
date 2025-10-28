@@ -242,7 +242,7 @@ void loop() {
       digitalWrite(output26, HIGH);
       digitalWrite(output27, LOW);
       openBridge();
-    } else if ((distance1 > 100) && (distance2 > 100)) {
+    } else if ((distance1 > 50) && (distance2 > 50)) {
       Serial.println("No ship detected, closing bridge...");
       shipDetected = false;
       digitalWrite(output26, LOW);
